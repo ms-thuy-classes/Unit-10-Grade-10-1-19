@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo-Vocab Pro</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Lexend', sans-serif; background-color: #f7f7f7; color: #1a1a1a; overflow-x: hidden; }
+        .neo-shadow { border: 3px solid #000; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); }
+        @media (min-width: 768px) { .neo-shadow { box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); } }
+        
+        .neo-button { 
+            border: 3px solid #000; 
+            box-shadow: 3px 3px 0px 0px rgba(0,0,0,1);
+            transition: all 0.15s ease;
+        }
+        .neo-button:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px 0px rgba(0,0,0,1); }
+
+        /* Responsive Flashcard Height */
+        .flip-card { perspective: 1000px; height: 320px; width: 100%; max-width: 400px; }
+        @media (min-width: 768px) { .flip-card { height: 400px; } }
+
+        .flip-card-inner {
+            position: relative; width: 100%; height: 100%;
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-style: preserve-3d;
+        }
+        .is-flipped { transform: rotateY(180deg); }
+        .flip-card-front, .flip-card-back {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden; display: flex;
+            flex-direction: column; justify-content: center; align-items: center;
+            border: 4px solid black; border-radius: 1.5rem; padding: 1.5rem;
+            box-shadow: 6px 6px 0px 0px rgba(0,0,0,1);
+        }
+        @media (min-width: 768px) { .flip-card-front, .flip-card-back { box-shadow: 12px 12px 0px 0px rgba(0,0,0,1); padding: 2rem; } }
+        
+        .flip-card-back { transform: rotateY(180deg); }
+        .bg-pastel-1 { background: linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%); }
+        .bg-pastel-2 { background: linear-gradient(135deg, #D9AFD9 0%, #97D9E1 100%); }
+        .bg-pastel-3 { background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); }
+        .fade-enter-active { transition: all 0.3s ease-out; }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+    </style>
+</head>
+<body class="p-3 md:p-8">
+    <div id="app" class="max-w-2xl mx-auto">
+        
+        <header class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-white p-4 neo-shadow rounded-2xl">
+            <h1 class="text-xl md:text-2xl font-black italic tracking-tight text-center sm:text-left">
+                VOCAB <span class="hidden sm:inline">with Ms. Thúy</span><span class="text-pink-500">.</span>NEO
+            </h1>
+            <div class="flex gap-2 sm:gap-3 w-full sm:w-auto">
+                <button @click="mode = 'learn'" :class="mode === 'learn' ? 'bg-yellow-300' : 'bg-white'" class="neo-button flex-1 sm:flex-none px-4 sm:px-5 py-2 font-black rounded-lg text-xs sm:text-sm uppercase">Học</button>
+                <button @click="startQuiz" :class="mode === 'quiz' ? 'bg-green-300' : 'bg-white'" class="neo-button flex-1 sm:flex-none px-4 sm:px-5 py-2 font-black rounded-lg text-xs sm:text-sm uppercase">Quiz</button>
+            </div>
+        </header>
+
+        <div v-if="mode === 'learn'" class="animate-fadeIn">
+            <div class="text-center mb-4">
+                <span class="inline-block bg-white border-2 border-black px-4 py-1 rounded-full font-black text-[10px] sm:text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] uppercase">
+                    Thẻ {{ currentIndex + 1 }} / {{ words.length }}
+                </span>
+            </div>
+
+            <div class="flip-card mx-auto" @click="toggleFlip">
+                <div class="flip-card-inner" :class="{ 'is-flipped': isFlipped }">
+                    <div class="flip-card-front bg-pastel-1">
+                        <div class="absolute top-3 left-3 bg-black text-white text-[8px] sm:text-[10px] font-black px-2 py-1 rounded">ENGLISH</div>
+                        <h2 class="text-3xl sm:text-5xl font-black mb-3 text-center break-words w-full px-2">{{ currentWord.word }}</h2>
+                        <p class="text-lg sm:text-xl text-gray-800 font-medium bg-white/50 px-3 py-1 rounded-full border-2 border-black">{{ currentWord.ipa }}</p>
+                    </div>
+                    <div class="flip-card-back bg-pastel-2">
+                        <div class="absolute top-3 left-3 bg-black text-white text-[8px] sm:text-[10px] font-black px-2 py-1 rounded">MEANING</div>
+                        <h3 class="text-2xl sm:text-4xl font-black mb-4 sm:mb-6 text-center">{{ currentWord.meaning }}</h3>
+                        <div class="text-center bg-white/40 p-3 sm:p-4 rounded-xl border-2 border-dashed border-black w-full">
+                            <p class="italic text-sm sm:text-lg mb-2 leading-tight" v-html="highlightCollocation(currentWord.example)"></p>
+                            <p class="text-[10px] sm:text-sm font-bold text-gray-700 border-t border-black/10 pt-2">{{ currentWord.ex_vn }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-center items-center gap-6 sm:gap-8 mt-10 sm:mt-12">
+                <button @click="prevWord" class="neo-button bg-white p-4 sm:p-5 rounded-full hover:bg-gray-50">
+                    <svg width="20" height="20" class="sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <button @click="speak(currentWord.word)" class="neo-button bg-pink-400 p-5 sm:p-6 rounded-full transform hover:scale-110">
+                    <svg width="24" height="24" class="sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                </button>
+                <button @click="nextWord" class="neo-button bg-white p-4 sm:p-5 rounded-full hover:bg-gray-50">
+                    <svg width="20" height="20" class="sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div v-else-if="mode === 'quiz'">
+            <div class="flex justify-between items-end mb-4 px-1">
+                <span class="bg-black text-white px-3 py-1 rounded-full font-black text-[10px] sm:text-sm uppercase tracking-tighter">Câu {{ currentQuizIndex + 1 }} / {{ quizData.length }}</span>
+                <span class="font-black text-[10px] sm:text-sm text-green-600">ĐÚNG: {{ score }}</span>
+            </div>
+            
+            <div class="bg-pastel-3 p-5 sm:p-8 rounded-2xl neo-shadow mb-6 min-h-[250px] sm:min-h-[280px] flex flex-col justify-center relative">
+                <div v-if="currentQuestion.type === 'mean'" class="text-center">
+                    <p class="text-[10px] sm:text-sm font-black opacity-50 mb-2 uppercase">Dịch sang tiếng Anh:</p>
+                    <h3 class="text-2xl sm:text-4xl font-black mb-6 sm:mb-8">{{ currentQuestion.q }}</h3>
+                    <input v-model="userInput" @keyup.enter="checkAnswer" :disabled="feedback" type="text" placeholder="Gõ từ..." class="w-full p-3 sm:p-4 border-4 border-black rounded-xl text-lg sm:text-xl font-black focus:outline-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                </div>
+
+                <div v-if="currentQuestion.type === 'audio'" class="text-center">
+                    <p class="text-[10px] sm:text-sm font-black opacity-50 mb-4 sm:mb-6 uppercase">Nghe và ghi lại từ:</p>
+                    <button @click="speak(currentQuestion.ans)" class="neo-button bg-white p-5 sm:p-6 rounded-full mb-6 sm:mb-8">
+                         <svg width="30" height="30" class="sm:w-10 sm:h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
+                    <input v-model="userInput" @keyup.enter="checkAnswer" :disabled="feedback" type="text" placeholder="Bạn nghe thấy gì?" class="w-full p-3 sm:p-4 border-4 border-black rounded-xl text-lg sm:text-xl font-black focus:outline-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                </div>
+
+                <div v-if="currentQuestion.type === 'choice'">
+                    <p class="text-[10px] sm:text-sm font-black opacity-50 mb-3 text-center uppercase">Điền từ phù hợp:</p>
+                    <h3 class="text-base sm:text-xl font-black mb-6 sm:mb-8 text-center leading-relaxed p-3 sm:p-4 bg-white/30 rounded-lg border-2 border-black" v-html="currentQuestion.q"></h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <button v-for="opt in currentQuestion.options" @click="selectOption(opt)" :disabled="feedback" 
+                            :class="getOptionClass(opt)" class="neo-button p-3 sm:p-4 font-black rounded-xl text-sm md:text-base transition-all uppercase tracking-tight">
+                            {{ opt }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="feedback" :class="feedback.isCorrect ? 'bg-green-400' : 'bg-red-400'" class="p-3 sm:p-4 mb-4 neo-shadow rounded-xl font-black text-center text-lg sm:text-xl animate-bounce">
+                {{ feedback.isCorrect ? 'QUÁ CHUẨN! ✨' : 'TIẾC QUÁ! 🧩' }}
+            </div>
+
+            <transition name="fade">
+                <div v-if="feedback" class="bg-yellow-100 p-4 sm:p-5 border-4 border-black rounded-xl mb-6 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] relative">
+                    <p class="font-black text-sm sm:text-lg leading-tight">
+                        <span class="text-blue-600 uppercase">{{ currentQuestion.noteTitle }}</span> : <span class="text-gray-800">{{ currentQuestion.noteMean }}</span>
+                    </p>
+                </div>
+            </transition>
+
+            <button v-if="!feedback" @click="checkAnswer" class="w-full neo-button bg-black text-white p-4 sm:p-5 rounded-2xl font-black text-lg sm:text-xl uppercase">Kiểm tra</button>
+            <button v-else @click="nextQuiz" class="w-full neo-button bg-blue-500 text-white p-4 sm:p-5 rounded-2xl font-black text-lg sm:text-xl uppercase">Tiếp tục</button>
+        </div>
+
+        <div v-else-if="mode === 'summary'" class="text-center animate-fadeIn">
+            <div class="bg-white p-6 sm:p-10 rounded-3xl neo-shadow mb-8 relative">
+                <h2 class="text-xl sm:text-3xl font-black mb-4 uppercase">KẾT THÚC!</h2>
+                <div class="text-6xl sm:text-8xl font-black text-pink-500 mb-2">{{ score }}<span class="text-black text-2xl sm:text-3xl">/{{ quizData.length }}</span></div>
+            </div>
+            
+            <div v-if="needsReview.length > 0" class="text-left bg-white p-4 sm:p-6 rounded-2xl border-4 border-black neo-shadow mb-8 max-h-[300px] overflow-y-auto">
+                <h3 class="font-black text-lg sm:text-xl mb-4 text-red-500 underline uppercase italic">Cần xem lại:</h3>
+                <div class="grid grid-cols-1 gap-2">
+                    <div v-for="word in needsReview" class="flex justify-between items-center bg-gray-50 p-2 sm:p-3 rounded-lg border-2 border-black/10">
+                        <span class="font-black text-blue-600 text-sm sm:text-base">{{ word.word }}</span>
+                        <span class="font-bold text-[10px] sm:text-sm text-gray-600">{{ word.meaning }}</span>
+                    </div>
+                </div>
+            </div>
+            <button @click="resetApp" class="neo-button bg-green-400 w-full p-4 sm:p-5 rounded-2xl font-black text-xl sm:text-2xl uppercase">Học lại từ đầu</button>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed } = Vue;
+        createApp({
+            setup() {
+                const mode = ref('learn');
+                const currentIndex = ref(0);
+                const isFlipped = ref(false);
+                const userInput = ref('');
+                const feedback = ref(null);
+                const score = ref(0);
+                const currentQuizIndex = ref(0);
+                const needsReview = ref([]);
+
+                const words = ref([
+                    {word: "action", type: "n", ipa: "/ˈækʃən/", meaning: "Hành động", example: "The government must **take action** to protect the environment.", ex_vn: "Chính phủ phải hành động để bảo vệ môi trường."},
+                    {word: "attraction", type: "n", ipa: "/əˈtrækʃən/", meaning: "Sự thu hút", example: "The city's main **tourist attraction** is the old castle.", ex_vn: "Điểm thu hút khách du lịch chính của thành phố là tòa lâu đài cổ."},
+                    {word: "business", type: "n", ipa: "/ˈbɪznɪs/", meaning: "Việc kinh doanh", example: "He runs a small **family business**.", ex_vn: "Anh ấy điều hành một doanh nghiệp gia đình nhỏ."},
+                    {word: "collection", type: "n", ipa: "/kəˈlekʃən/", meaning: "Bộ sưu tập", example: "She has an amazing **stamp collection**.", ex_vn: "Cô ấy có một bộ sưu tập tem đáng kinh ngạc."},
+                    {word: "coral", type: "n", ipa: "/ˈkɔːrəl/", meaning: "San hô", example: "We went diving to see the **coral reef**.", ex_vn: "Chúng tôi đã đi lặn để ngắm rặng san hô."},
+                    {word: "craft", type: "v", ipa: "/kræft/", meaning: "Làm thủ công", example: "Each piece is **carefully crafted** by hand.", ex_vn: "Mỗi tác phẩm đều được chế tác thủ công một cách cẩn thận."},
+                    {word: "craftsmen", type: "n", ipa: "/ˈkræfts.mən/", meaning: "Thợ thủ công", example: "Local **skilled craftsmen** made these souvenirs.", ex_vn: "Những người thợ thủ công lành nghề địa phương đã làm ra những món quà lưu niệm này."},
+                    {word: "dive", type: "v", ipa: "/daɪv/", meaning: "Lặn biển", example: "They love to **go diving** in the crystal clear water.", ex_vn: "Họ thích đi lặn trong làn nước trong vắt."},
+                    {word: "documentary", type: "n", ipa: "/ˌdɑːkjəˈment̬ɚi/", meaning: "Phim tài liệu", example: "I watched a **nature documentary** about the ocean.", ex_vn: "Tôi đã xem một bộ phim tài liệu thiên nhiên về đại dương."},
+                    {word: "eco-friendly", type: "adj", ipa: "/iː.koʊ-ˈfrendli/", meaning: "Thân thiện môi trường", example: "We should use **eco-friendly products**.", ex_vn: "Chúng ta nên sử dụng các sản phẩm thân thiện với môi trường."},
+                    {word: "ecotour", type: "n", ipa: "/iː.koʊ tʊər/", meaning: "Du lịch sinh thái", example: "They booked an **ecotour** to explore the rainforest.", ex_vn: "Họ đã đặt một chuyến du lịch sinh thái để khám phá rừng mưa."},
+                    {word: "equipment", type: "n", ipa: "/ɪˈkwɪpmənt/", meaning: "Trang bị", example: "You need proper **diving equipment** for safety.", ex_vn: "Bạn cần thiết bị lặn phù hợp để đảm bảo an toàn."},
+                    {word: "experience", type: "n", ipa: "/ɪkˈspɪriəns/", meaning: "Trải nghiệm", example: "Traveling gives you **valuable experience**.", ex_vn: "Du lịch mang lại cho bạn những trải nghiệm quý giá."},
+                    {word: "explore", type: "v", ipa: "/ɪkˈsplɔːr/", meaning: "Khám phá", example: "We want to **explore the world** together.", ex_vn: "Chúng tôi muốn cùng nhau khám phá thế giới."},
+                    {word: "fieldtrip", type: "n", ipa: "/fieldtrip/", meaning: "Chuyến đi thực tế", example: "The school organized a **science fieldtrip**.", ex_vn: "Trường học đã tổ chức một chuyến đi thực tế khoa học."},
+                    {word: "handmade", type: "adj", ipa: "/ˌhændˈmeɪd/", meaning: "Đồ thủ công", example: "She sells **handmade jewelry** on Etsy.", ex_vn: "Cô ấy bán đồ trang sức làm bằng tay trên Etsy."},
+                    {word: "herb", type: "n", ipa: "/ɝːb/", meaning: "Thảo dược", example: "This tea is made from **natural herbs**.", ex_vn: "Loại trà này được làm từ các loại thảo mộc tự nhiên."},
+                    {word: "impact", type: "n,v", ipa: "/ˈɪmpækt/", meaning: "Ảnh hưởng", example: "Tourism has a **huge impact** on the local economy.", ex_vn: "Du lịch có tác động to lớn đến nền kinh tế địa phương."},
+                    {word: "industry", type: "n", ipa: "/ˈɪndəstri/", meaning: "Công nghiệp", example: "The **tourism industry** is recovering fast.", ex_vn: "Ngành công nghiệp du lịch đang phục hồi nhanh chóng."}
+                ]);
+
+                const quizData = ref([]);
+                const currentWord = computed(() => words.value[currentIndex.value]);
+                const currentQuestion = computed(() => quizData.value[currentQuizIndex.value]);
+
+                const toggleFlip = () => { isFlipped.value = !isFlipped.value; if(!isFlipped.value) speak(currentWord.value.word); };
+                const nextWord = () => { isFlipped.value = false; currentIndex.value = (currentIndex.value + 1) % words.value.length; };
+                const prevWord = () => { isFlipped.value = false; currentIndex.value = currentIndex.value === 0 ? words.value.length - 1 : currentIndex.value - 1; };
+                const highlightCollocation = (text) => text.replace(/\*\*(.*?)\*\*/g, '<b class="text-pink-600">$1</b>');
+                const speak = (text) => { const msg = new SpeechSynthesisUtterance(text); msg.lang = 'en-US'; window.speechSynthesis.speak(msg); };
+
+                const startQuiz = () => {
+                    mode.value = 'quiz'; currentQuizIndex.value = 0; score.value = 0; needsReview.value = []; feedback.value = null; userInput.value = '';
+                    const shuffled = [...words.value].sort(() => 0.5 - Math.random());
+                    const part = Math.floor(shuffled.length / 3);
+                    quizData.value = shuffled.map((w, idx) => {
+                        if (idx < part) return { type: 'mean', q: w.meaning, ans: w.word, noteTitle: w.word, noteMean: w.meaning, original: w };
+                        if (idx < part * 2) return { type: 'audio', q: 'Listen', ans: w.word, noteTitle: w.word, noteMean: w.meaning, original: w };
+                        const qText = w.example.replace(/\*\*(.*?)\*\*/g, (match, p1) => {
+                            return p1.toLowerCase().includes(w.word.toLowerCase()) ? p1.replace(new RegExp(w.word, 'gi'), '_______') : match;
+                        }).replace(/\*\*/g, ''); 
+                        const options = [w.word, ...shuffled.filter(s => s.word !== w.word).slice(0, 3).map(s => s.word)].sort(() => 0.5 - Math.random());
+                        return { type: 'choice', q: qText, options, ans: w.word, noteTitle: w.example.replace(/\*\*/g, ''), noteMean: w.ex_vn, original: w };
+                    });
+                };
+
+                const checkAnswer = () => {
+                    if (!userInput.value.trim() || feedback.value) return;
+                    processResult(userInput.value.trim().toLowerCase() === currentQuestion.value.ans.toLowerCase());
+                };
+                const selectOption = (opt) => { if (feedback.value) return; processResult(opt === currentQuestion.value.ans); };
+                const processResult = (isCorrect) => {
+                    feedback.value = { isCorrect };
+                    if (isCorrect) { score.value++; }
+                    else { needsReview.value.push(currentQuestion.value.original); }
+                };
+                const nextQuiz = () => {
+                    feedback.value = null; userInput.value = '';
+                    if (currentQuizIndex.value < quizData.value.length - 1) currentQuizIndex.value++;
+                    else mode.value = 'summary';
+                };
+                const getOptionClass = (opt) => {
+                    if (!feedback.value) return 'bg-white hover:bg-yellow-200';
+                    return opt === currentQuestion.value.ans ? 'bg-green-400' : 'bg-red-200 opacity-50';
+                };
+                const resetApp = () => { mode.value = 'learn'; currentIndex.value = 0; isFlipped.value = false; };
+
+                return { mode, currentIndex, words, currentWord, isFlipped, toggleFlip, nextWord, prevWord, highlightCollocation, speak, startQuiz, quizData, currentQuizIndex, currentQuestion, userInput, checkAnswer, selectOption, feedback, nextQuiz, score, needsReview, resetApp, getOptionClass };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
